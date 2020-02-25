@@ -73,9 +73,10 @@ stages:
   displayName: 'Deploy web application to DEV'
   dependsOn: Build   
   condition: |   #condition that directs the system to run the stage only when previous stage succeds and the current branch is release. This ensures that relase features are deployed ONLY to DEV env.
-    and(
+    and
+    (
       succeeded(),
-      eq(variables['Build.SourceBranch'], variables['releaseBranchName'])
+      eq(variables['Build.SourceBranchName'], variables['releaseBranchName'])
     )
   jobs:
   - deployment: Deploy  #especial job "deployment"
