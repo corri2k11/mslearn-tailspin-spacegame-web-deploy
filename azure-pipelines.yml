@@ -8,9 +8,21 @@ variables:
   buildConfiguration: 'Release'
   releaseBranchName: 'release'
 
+#Define Schedules section with cron expression. 
+#You can define more than one expresion.
+#It triggers the pipeline to run against  the release branch (taking code from github release branch, building and deploying all the way to QA every day at 3AM.)
+#always: flag set to FALSE, means pipeline always runs BUT ONLY when release branch has changes (different than prior run), otherwise pipeline wont run!
+schedules:
+  - cron: '0 3 * * *'
+    displayName: 'Deploy to QA everyday at 3 AM'
+    branches:
+      include:
+      - release
+    always: false
+
 stages:
 - stage: 'Build'
-  displayName: 'Build the web application'
+  displayName: 'Build Web application'
   jobs: 
   - job: 'Build'
     displayName: 'Build job'
@@ -70,7 +82,7 @@ stages:
       artifact: drop
 
 - stage: 'DEV'
-  displayName: 'Deploy web application to DEV'
+  displayName: 'Deploy to DEV'
   dependsOn: Build   
   condition: |   #condition that directs the system to run the stage only when previous stage succeds and the current branch is release. This ensures that relase features are deployed ONLY to DEV env.
     and
@@ -96,4 +108,33 @@ stages:
             inputs:
               azureSubscription: 'azAppServiceCon'  #service connection name
               appName: '$(AzWebAppNameDev)'         #uses WebAppNameDev to deploy to mapped Azure App Service instance associated to DEV env.
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+#condition: runs the stage only when the build reason equals Schedule
+#if condition is false, stage is skipped, but the prior stages (like build) continue to run.
+#for learning purpose, condition is commmented out to enable change be deployed from DEV to QA 
+#w/out having to wait for schedule to be triggered at 3 AM!  just let it flow...
+#by default, if no condition is set, it will run the stage!
+- stage: 'QA'
+  displayName: 'Deploy to QA'
+  dependsOn: DEV
+  #condition: eq(variables['Build.Reason'],'Schedule')
+  jobs:
+  - deployment: Deploy
+    pool:
+      vmImage: 'ubuntu-16.04'
+    environment: QA
+    variables:
+    - group: 'Release'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service QA Deployment'
+            inputs:
+              azureSubscription: 'azAppServiceCon'  #service connection name
+              appName: '$(AzWebAppNameQA)'          #uses WebAppNameQA to deploy to mapped Azure App Service instance associated to QA env.
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
