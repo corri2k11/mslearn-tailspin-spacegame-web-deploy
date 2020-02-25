@@ -1,11 +1,6 @@
 trigger:
 - '*'
 
-# pool:
-#   vmImage: 'ubuntu-16.04'
-#   demands:
-#     - npm
-
 variables:
   buildConfiguration: 'Release'
 
@@ -67,3 +62,26 @@ stages:
 
         - publish: '$(Build.ArtifactStagingDirectory)'
           artifact: drop
+  - stage: 'Deploy'
+    displayName: 'Deploying the Web Application'
+    dependsOn: 'build'
+    jobs:
+      - job:
+        displayName: 'Deploy Job'
+        pool:
+          vmImage: 'ubuntu-16.04'
+        variables:
+        - group: Release
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - download: current
+                artifact: drop
+              - task: AzureWebApp@1
+                displayName: 'Azure AppService Deployment: Website'
+                inputs:
+                  azureSubscription: 'TailspinSpaceGameAzureCon'
+                  appName: '$(AzureWebAppNameVar)'
+                  package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+      
