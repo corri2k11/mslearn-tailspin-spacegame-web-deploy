@@ -1,8 +1,12 @@
+#This configuration resembles the one that you built in the 
+#POC (Proof of concept) on the previous module.
+
 trigger:
 - '*'
 
 variables:
   buildConfiguration: 'Release'
+  releaseBranchName: 'release'
 
 stages:
 - stage: 'Build'
@@ -65,11 +69,16 @@ stages:
     - publish: '$(Build.ArtifactStagingDirectory)'
       artifact: drop
 
-- stage: 'Deploy'
-  displayName: 'Deploy the web application'
-  dependsOn: Build
+- stage: 'DEV'
+  displayName: 'Deploy web application to DEV'
+  dependsOn: Build   
+  condition: |   #condition that directs the system to run the stage only when previous stage succeds and the current branch is release. This ensures that relase features are deployed ONLY to DEV env.
+    and(
+      succeeded(),
+      eq(variables['Build.SourceBranch'], variables['releaseBranchName'])
+    )
   jobs:
-  - deployment: Deploy
+  - deployment: Deploy  #especial job "deployment"
     pool:
       vmImage: 'ubuntu-16.04'
     environment: dev
@@ -82,8 +91,8 @@ stages:
           - download: current
             artifact: drop
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service DEV Deployment'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppName)'
+              azureSubscription: 'azAppServiceCon'  #service connection name
+              appName: '$(AzWebAppNameDev)'         #uses WebAppNameDev to deploy to mapped Azure App Service instance associated to DEV env.
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
