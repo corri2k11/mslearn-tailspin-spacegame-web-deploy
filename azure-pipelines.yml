@@ -10,7 +10,7 @@ variables:
 
 #Define Schedules section with cron expression. 
 #You can define more than one expresion.
-#It triggers the pipeline to run against  the release branch (taking code from github release branch, building and deploying all the way to QA every day at 3AM.)
+#It triggers the pipeline to run against the release branch (taking code from github release branch, building and deploying all the way to QA every day at 3AM.)
 #always: flag set to FALSE, means pipeline always runs BUT ONLY when release branch has changes (different than prior run), otherwise pipeline wont run!
 schedules:
   - cron: '0 3 * * *'
@@ -125,7 +125,7 @@ stages:
       vmImage: 'ubuntu-16.04'
     environment: QA
     variables:
-    - group: 'Release'
+    - group: Release
     strategy:
       runOnce:
         deploy:
@@ -138,3 +138,32 @@ stages:
               azureSubscription: 'azAppServiceCon'  #service connection name
               appName: '$(AzWebAppNameQA)'          #uses WebAppNameQA to deploy to mapped Azure App Service instance associated to QA env.
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+- stage: 'STAGING'
+  displayName: 'Deploy to STAGING'
+  dependsOn: QA
+  jobs:
+  - deployment: Deploy  #special job
+    pool:
+      vmImage: 'ubuntu-16.04'
+    environment: STAGING
+    variables:
+    - group: 'Release'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service STAGING Deployment'
+            inputs:
+              azureSubscription: 'azAppServiceCon'  #service connection name
+              appName: '$(AzWebAppNameSTAGING)'     #uses WebAppNameSTAGING to deploy to mapped Azure App Service instance associated to STAGING env.
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+
+#You probably noticed that all three of your deployment stages follow identical steps
+#You can use TEMPLATES to define COMMON BUILD TASKS one time and REUSE THEM MULTIPLE TIMES
+#Already used this technique in a prior module.. here, only for learning purpose and sake of time, we repeat steps in multiple stages
+
