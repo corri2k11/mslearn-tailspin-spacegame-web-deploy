@@ -14,11 +14,9 @@ stages:
       vmImage: 'ubuntu-16.04'
       demands:
         - npm
-
     variables:
       wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
       dotnetSdkVersion: '3.1.100'
-
     steps:
     - task: UseDotNet@2
       displayName: 'Use .NET Core SDK $(dotnetSdkVersion)'
@@ -64,15 +62,123 @@ stages:
 
     - publish: '$(Build.ArtifactStagingDirectory)'
       artifact: drop
+  - job: 'BuildDbDacPac'  #new build job! Create dacpac file
+    pool:
+      vmImage: 'ubuntu-16.04'
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore project dependencies'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
 
-- stage: 'Dev'
-  displayName: 'Deploy to the dev environment'
+    #Generate DB .dacpac by building VS DB project
+    - task: VSBuild@1
+      displayName: 'Build DB project'
+      inputs:
+        project: '**/*.sqlproj'
+    
+    #Copy generated .dacpac artifact to Pipeline Temp Staging Directory
+    - task: CopyFiles@2
+      displayName: 'Copy DB dacpac file to staging directory'
+      inputs:
+        contents: Tailspin.SpaceGame.Web/bin/**/*.dacpac
+        TargetFolder: '$(Build.StagingDirectory)'
+    
+    #Public .dacpac artifact to Pipeline Artifacts Directory
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish DB .dacpac Artifact to Pipeline'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: dropDacpac
+      condition: succeededOrFailed()
+
+- stage: 'DB_VERIFICATION'
+  displayName: 'DB Schema Change Verification'
   dependsOn: Build
+  jobs:
+  - deployment: 'DB'
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    environment: 'DB_VERIFICATION'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            #Download DB dacpac Artifact, onput for next task...
+            - download: current
+              artifact: dropDacpac  #Download and Read dacpac..
+              patterns: '**/*'
+
+            #Generate Schema Change Script file (SQLDelta.sql)
+            - task: SqlAzureDacpacDeployment@1
+              displayName: 'Generate Schema Change Script (SQLDelta.sql)'
+              inputs:
+                azureSubscription: 'azAppServiceCon'
+                authenticationType: 'server'
+                serverName: '$(dbServerName).database.windows.net'
+                DatabaseName: '$(dbName)'
+                sqlUsername: '$(dbAdminLogin)'
+                sqlPassword: '$(dbAdminPassword)'
+                deployType: 'DacpacTask'
+                deploymentAction: 'Script'
+                dacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
+                IpDetectionMethod: 'AutoDetect'
+
+            #Reads contents from SQLDelta.sql script file, publish it to the Pipeline
+            #By using script output (Get-Content), the database administrator can approve the changes before the changes are applied to the database.
+            - task: PowerShell@2
+              displayName: 'Read, Publish Auto Generated SQL Changes Script Contents to Pipeline'
+              inputs:
+                targetType: 'inline'
+                script: |
+                  Write-Host "Auto Generated SQL Changes Script (SQLDelta.sql)"
+                  Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
+
+- stage: 'DB_APPLY'
+  displayName: 'Apply DB Schema Changes'
+  dependsOn: DB_VERIFICATION
+  jobs:
+  - deployment: DB_APPLY
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    environment: DB_APPLY
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #Download DB dacpac Artifact, input for next task...
+          - download: current
+            artifact: dropDacpac
+            patterns: '**/*'
+          
+          #APPLY DB schema change to Azure SQL Database! after DBA verified/approved change
+          - task: SqlAzureDacpacDeployment@1
+            displayName: 'Deploy and Apply SQL Schema Change'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              authenticationType: 'server'
+              serverName: '$(dbServerName).database.windows.net'
+              DatabaseName: '$(dbName)'
+              sqlUsername: '$(dbAdminLogin)'
+              sqlPassword: '$(dbAdminPassword)'
+              deployType: 'DacpacTask'
+              deploymentAction: 'Publish'
+              DacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
+              ipDetectionMethod: 'AutoDetect'
+          
+- stage: 'DEV'
+  displayName: 'Deploy to DEV'
+  dependsOn: DB_APPLY
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: dev
+    environment: DEV
     variables:
     - group: Release
     strategy:
@@ -88,14 +194,14 @@ stages:
               appName: '$(WebAppNameDev)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
-- stage: 'Test'
-  displayName: 'Deploy to the test environment'
-  dependsOn: Dev
+- stage: 'QA'
+  displayName: 'Deploy to QA'
+  dependsOn: DEV
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: test
+    environment: QA
     variables:
     - group: 'Release'
     strategy:
@@ -111,14 +217,14 @@ stages:
               appName: '$(WebAppNameTest)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
-- stage: 'Staging'
-  displayName: 'Deploy to the staging environment'
-  dependsOn: Test
+- stage: 'STAGING'
+  displayName: 'Deploy to STAGING'
+  dependsOn: QA
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: staging
+    environment: STAGING
     variables:
     - group: 'Release'
     strategy:
