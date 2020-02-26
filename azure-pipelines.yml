@@ -114,7 +114,7 @@ stages:
 
             #Generate Schema Change Script file (SQLDelta.sql)
             - task: SqlAzureDacpacDeployment@1
-              displayName: 'Generate Schema Change Script (SQLDelta.sql)'
+              displayName: 'Generate Schema Change Script (SQLDelta.sql - DB VERIFY)'
               inputs:
                 azureSubscription: 'azAppServiceCon'
                 authenticationType: 'server'
@@ -158,7 +158,7 @@ stages:
           
           #APPLY DB schema change to Azure SQL Database! after DBA verified/approved change
           - task: SqlAzureDacpacDeployment@1
-            displayName: 'Deploy and Apply SQL Schema Change'
+            displayName: 'Deploy and Apply SQL Schema Change (DB APPLY)'
             inputs:
               azureSubscription: 'azAppServiceCon'
               authenticationType: 'server'
@@ -187,10 +187,11 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (DEV)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              azureSubscription: 'azAppServiceCon'
               appName: '$(WebAppNameDev)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
@@ -210,11 +211,12 @@ stages:
           steps:
           - download: current
             artifact: drop
+            
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (QA)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameTest)'
+              azureSubscription: 'azAppServiceCon'
+              appName: '$(WebAppNameQA)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
 - stage: 'STAGING'
@@ -234,8 +236,8 @@ stages:
           - download: current
             artifact: drop
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (STAGING)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              azureSubscription: 'azAppServiceCon'
               appName: '$(WebAppNameStaging)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
