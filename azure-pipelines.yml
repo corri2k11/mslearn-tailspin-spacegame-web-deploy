@@ -98,7 +98,7 @@ stages:
   displayName: 'Verify database schema changes (DB VERIFY)'
   dependsOn: BUILD
   jobs:
-  - deployment: DB_VERIFY
+  - deployment: Deploy
     pool:
       vmImage: 'windows-2019'
     variables:
@@ -180,7 +180,7 @@ stages:
       eq(variables['schemaChanged'],True)
     )
   jobs:
-  - deployment: DB_APPLY
+  - deployment: Deploy
     pool:
       vmImage: 'windows-2019'
     variables:
@@ -243,7 +243,7 @@ stages:
       in(dependencies.DB_VERIFY.result,'Succeeded','Skipped')
     )
   jobs:
-  - deployment: DEV
+  - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
     environment: DEV
@@ -266,8 +266,9 @@ stages:
 - stage: 'QA'
   displayName: 'Deploy to QA'
   dependsOn: DEV
+  condition: succeeded()
   jobs:
-  - deployment: QA
+  - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
     environment: QA
@@ -279,6 +280,7 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
             displayName: 'Azure App Service Deploy: website (QA)'
             inputs:
@@ -289,8 +291,9 @@ stages:
 - stage: 'STAGING'
   displayName: 'Deploy to STAGING'
   dependsOn: QA
+  condition: succeeded() 
   jobs:
-  - deployment: STAGING
+  - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
     environment: STAGING
@@ -302,6 +305,7 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
             displayName: 'Azure App Service Deploy: website (STAGING)'
             inputs:
