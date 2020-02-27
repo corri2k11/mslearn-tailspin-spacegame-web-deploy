@@ -4,6 +4,7 @@
     [profileId] INT NOT NULL, 
     [score] INT NULL, 
     [gameMode] NVARCHAR(10) NULL, 
-    [gameRegion] NVARCHAR(50) NULL, 
+    [gameRegion] NVARCHAR(50) NULL,
+    [ranking] INT NULL, 
     CONSTRAINT [FK_Scores_Profiles] FOREIGN KEY ([profileId]) REFERENCES [profiles]([id])
    )
