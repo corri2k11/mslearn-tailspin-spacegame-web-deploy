@@ -266,7 +266,7 @@ stages:
 - stage: 'QA'
   displayName: 'Deploy to QA'
   dependsOn: DEV
-  condition: succeeded()
+  condition: succeeded('DEV')
   jobs:
   - deployment: Deploy
     pool:
@@ -291,7 +291,7 @@ stages:
 - stage: 'STAGING'
   displayName: 'Deploy to STAGING'
   dependsOn: QA
-  condition: succeeded() 
+  condition: succeeded('QA') 
   jobs:
   - deployment: Deploy
     pool:
