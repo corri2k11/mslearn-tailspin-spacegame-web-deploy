@@ -127,16 +127,58 @@ stages:
               ipDetectionMethod: 'AutoDetect'
 
           - task: PowerShell@2
-            displayName: Show Auto Generated SQL Script (SQLDelta.sql)
+            displayName: Show Generated SQL Script (SQLDelta.sql)
             inputs:
               targetType: 'inline'
               script: | 
                 Write-Host "Auto Generated SQL Update Script:"
                 Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
+          
+          - task: PowerShell@2
+            displayName: 'Check for Schema Changes. Add/Set "SchemaChanged" Pipeline Variable'
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Print the schema change script
+                Write-Host "Auto Generated SQL Update Script:"
+                Get-Content d:\a\1\s\GeneratedOutputFiles\$(databasename)_Script.sql | foreach {Write-Output $_}
+
+                # Check for schema changes
+                $file = Get-Content "d:\a\1\s\GeneratedOutputFiles\$(databasename)_Script.sql"
+                $containsWord = $file | %{$_ -match "CREATE" -or $_ -match "ALTER" -or $_ -match "DROP"}
+                if ($containsWord -contains $true) {
+                  Install-Module VSTeam -Scope CurrentUser -Force
+                  Set-VSTeamAccount –Account $(Acct) -PersonalAccessToken $(PAT)
+                  $methodParameters = @{
+                    ProjectName = "$(System.TeamProject)"
+                    Name = "Release"}
+                  $vg = Get-VSTeamVariableGroup @methodParameters
+                  $vars = @{}
+                  $vg.variables | Get-Member -MemberType *Property | %{$vars.($_.Name) = $vg.variables.($_.Name)}
+                  $varName = "schemaChanged"
+                  $vars.$varName= @{}
+                  $vars.$varName.value = "True"
+                  $vars.$varName.isSecret = $false
+                  $methodParameters = @{
+                    id = $vg.id
+                    ProjectName = "$(System.TeamProject)"
+                    Name = "Release"
+                    Description = ""
+                    Type = "Vsts"
+                    Variables = $vars}
+                  Update-VSTeamVariableGroup @methodParameters}
 
 - stage: DB_APPLY
+  variables:
+    - group: 'Release'
   displayName: 'Apply database schema changes (DB APPLY)'
   dependsOn: DB_VERIFY
+  condition: |
+    and
+    (
+      succeeded('DB_VERIFY'),
+      eq(variables['schemaChanged'],True)
+    )
   jobs:
   - deployment: DB_APPLY
     pool:
@@ -166,9 +208,40 @@ stages:
               dacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
               ipDetectionMethod: 'AutoDetect'
 
+          - task: PowerShell@2
+            displayName: 'Remove "SchemaChanged Pipeline Variable. Clean up"'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Install-Module VSTeam -Scope CurrentUser -Force
+                Set-VSTeamAccount –Account $(Acct) -PersonalAccessToken $(PAT)
+                $methodParameters = @{
+                  ProjectName = "$(System.TeamProject)"
+                  Name = "Release"}
+                $vg = Get-VSTeamVariableGroup  @methodParameters 
+                $vars = @{}
+                $vg.variables | Get-Member -MemberType *Property | %{$vars.($_.Name) = $vg.variables.($_.Name)}
+                $vars.Remove("schemaChanged")
+                $methodParameters = @{
+                  id = $vg.id
+                  ProjectName = "$(System.TeamProject)"
+                  Name = "Release"
+                  Description = ""
+                  Type = "Vsts"
+                  Variables = $vars}
+                Update-VSTeamVariableGroup @methodParameters
+
 - stage: 'DEV'
   displayName: 'Deploy to DEV'
-  dependsOn: DB_APPLY
+  dependsOn: 
+    - DB_VERIFY
+    - DB_APPLY
+  condition: |
+    and
+    (
+      succeeded('DB_VERIFY'),
+      in(dependencies.DB_VERIFY.result,'Succeeded','Skipped')
+    )
   jobs:
   - deployment: Deploy
     pool:
