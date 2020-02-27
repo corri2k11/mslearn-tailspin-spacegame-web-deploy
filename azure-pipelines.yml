@@ -141,10 +141,10 @@ stages:
               script: |
                 # Print the schema change script
                 Write-Host "Auto Generated SQL Update Script:"
-                Get-Content d:\a\1\s\GeneratedOutputFiles\$(databasename)_Script.sql | foreach {Write-Output $_}
+                Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
 
                 # Check for schema changes
-                $file = Get-Content "d:\a\1\s\GeneratedOutputFiles\$(databasename)_Script.sql"
+                $file = Get-Content "d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql"
                 $containsWord = $file | %{$_ -match "CREATE" -or $_ -match "ALTER" -or $_ -match "DROP"}
                 if ($containsWord -contains $true) {
                   Install-Module VSTeam -Scope CurrentUser -Force
