@@ -243,7 +243,7 @@ stages:
       in(dependencies.DB_VERIFY.result,'Succeeded','Skipped')
     )
   jobs:
-  - deployment: Deploy
+  - deployment: DEV
     pool:
       vmImage: 'ubuntu-16.04'
     environment: DEV
@@ -267,7 +267,7 @@ stages:
   displayName: 'Deploy to QA'
   dependsOn: DEV
   jobs:
-  - deployment: Deploy
+  - deployment: QA
     pool:
       vmImage: 'ubuntu-16.04'
     environment: QA
@@ -290,7 +290,7 @@ stages:
   displayName: 'Deploy to STAGING'
   dependsOn: QA
   jobs:
-  - deployment: Deploy
+  - deployment: STAGING
     pool:
       vmImage: 'ubuntu-16.04'
     environment: STAGING
