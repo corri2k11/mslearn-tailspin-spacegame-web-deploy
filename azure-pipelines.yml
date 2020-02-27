@@ -132,7 +132,7 @@ stages:
               targetType: 'inline'
               script: | 
                 Write-Host "Auto Generated SQL Update Script:"
-                Get-Content d:\a\1\s\GeneratedOutputFiles\$(databasename)_Script.sql | foreach {Write-Output $_}
+                Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
 
 - stage: DB_APPLY
   displayName: 'Apply database schema changes (DB APPLY)'
