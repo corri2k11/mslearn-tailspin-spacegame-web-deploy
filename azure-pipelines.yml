@@ -137,107 +137,107 @@ stages:
                   Write-Host "Auto Generated SQL Changes Script (SQLDelta.sql)"
                   Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
 
-# - stage: 'DB_APPLY'
-#   displayName: 'Apply DB Schema Change'
-#   dependsOn: DB_VERIFICATION
-#   jobs:
-#   - deployment: DB_APPLY
-#     pool:
-#       vmImage: 'windows-2019'
-#     variables:
-#     - group: 'Release'
-#     environment: DB_APPLY
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           #Download DB dacpac Artifact, input for next task...
-#           - download: current
-#             artifact: dropDacpac
-#             patterns: '**/*'
+- stage: 'DB_APPLY'
+  displayName: 'Apply DB Schema Change'
+  dependsOn: DB_VERIFICATION
+  jobs:
+  - deployment: DB_APPLY
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    environment: DB_APPLY
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #Download DB dacpac Artifact, input for next task...
+          - download: current
+            artifact: dropDacpac
+            patterns: '**/*'
           
-#           #APPLY DB schema change to Azure SQL Database! after DBA verified/approved change
-#           - task: SqlAzureDacpacDeployment@1
-#             displayName: 'Deploy and Apply SQL Schema Change (DB APPLY)'
-#             inputs:
-#               azureSubscription: 'azAppServiceCon'
-#               authenticationType: 'server'
-#               serverName: '$(dbServerName).database.windows.net'
-#               DatabaseName: '$(dbName)'
-#               sqlUsername: '$(dbAdminLogin)'
-#               sqlPassword: '$(dbAdminPassword)'
-#               deployType: 'DacpacTask'
-#               deploymentAction: 'Publish'
-#               DacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
-#               ipDetectionMethod: 'AutoDetect'
+          #APPLY DB schema change to Azure SQL Database! after DBA verified/approved change
+          - task: SqlAzureDacpacDeployment@1
+            displayName: 'Deploy and Apply SQL Schema Change (DB APPLY)'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              authenticationType: 'server'
+              serverName: '$(dbServerName).database.windows.net'
+              DatabaseName: '$(dbName)'
+              sqlUsername: '$(dbAdminLogin)'
+              sqlPassword: '$(dbAdminPassword)'
+              deployType: 'DacpacTask'
+              deploymentAction: 'Publish'
+              DacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
+              ipDetectionMethod: 'AutoDetect'
           
-# - stage: 'DEV'
-#   displayName: 'Deploy to DEV'
-#   dependsOn: DB_APPLY
-#   jobs:
-#   - deployment: Deploy
-#     pool:
-#       vmImage: 'ubuntu-16.04'
-#     environment: DEV
-#     variables:
-#     - group: Release
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
+- stage: 'DEV'
+  displayName: 'Deploy to DEV'
+  dependsOn: DB_APPLY
+  jobs:
+  - deployment: Deploy
+    pool:
+      vmImage: 'ubuntu-16.04'
+    environment: DEV
+    variables:
+    - group: Release
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
 
-#           - task: AzureWebApp@1
-#             displayName: 'Azure App Service Deploy: website (DEV)'
-#             inputs:
-#               azureSubscription: 'azAppServiceCon'
-#               appName: '$(WebAppNameDev)'
-#               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service Deploy: website (DEV)'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              appName: '$(WebAppNameDev)'
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
-# - stage: 'QA'
-#   displayName: 'Deploy to QA'
-#   dependsOn: DEV
-#   jobs:
-#   - deployment: Deploy
-#     pool:
-#       vmImage: 'ubuntu-16.04'
-#     environment: QA
-#     variables:
-#     - group: 'Release'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
+- stage: 'QA'
+  displayName: 'Deploy to QA'
+  dependsOn: DEV
+  jobs:
+  - deployment: Deploy
+    pool:
+      vmImage: 'ubuntu-16.04'
+    environment: QA
+    variables:
+    - group: 'Release'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
             
-#           - task: AzureWebApp@1
-#             displayName: 'Azure App Service Deploy: website (QA)'
-#             inputs:
-#               azureSubscription: 'azAppServiceCon'
-#               appName: '$(WebAppNameQA)'
-#               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service Deploy: website (QA)'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              appName: '$(WebAppNameQA)'
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
-# - stage: 'STAGING'
-#   displayName: 'Deploy to STAGING'
-#   dependsOn: QA
-#   jobs:
-#   - deployment: Deploy
-#     pool:
-#       vmImage: 'ubuntu-16.04'
-#     environment: STAGING
-#     variables:
-#     - group: 'Release'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - download: current
-#             artifact: drop
-#           - task: AzureWebApp@1
-#             displayName: 'Azure App Service Deploy: website (STAGING)'
-#             inputs:
-#               azureSubscription: 'azAppServiceCon'
-#               appName: '$(WebAppNameStaging)'
-#               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+- stage: 'STAGING'
+  displayName: 'Deploy to STAGING'
+  dependsOn: QA
+  jobs:
+  - deployment: Deploy
+    pool:
+      vmImage: 'ubuntu-16.04'
+    environment: STAGING
+    variables:
+    - group: 'Release'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            displayName: 'Azure App Service Deploy: website (STAGING)'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              appName: '$(WebAppNameStaging)'
+              package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
