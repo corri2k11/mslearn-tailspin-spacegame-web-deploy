@@ -93,49 +93,49 @@ stages:
         ArtifactName: dropDacpac
       condition: succeededOrFailed()
 
-# - stage: 'DB_VERIFICATION'
-#   displayName: 'Verify DB Schema Change'
-#   dependsOn: Build
-#   jobs:
-#   - deployment: 'DB'
-#     pool:
-#       vmImage: 'windows-2019'
-#     variables:
-#     - group: 'Release'
-#     environment: 'DB_VERIFICATION'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#             #Download DB dacpac Artifact, onput for next task...
-#             - download: current
-#               artifact: dropDacpac  #Download and Read dacpac..
-#               patterns: '**/*'
+- stage: 'DB_VERIFICATION'
+  displayName: 'Verify DB Schema Change'
+  dependsOn: Build
+  jobs:
+  - deployment: 'DB'
+    pool:
+      vmImage: 'windows-2019'
+    variables:
+    - group: 'Release'
+    environment: 'DB_VERIFICATION'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            #Download DB dacpac Artifact, onput for next task...
+            - download: current
+              artifact: dropDacpac  #Download and Read dacpac..
+              patterns: '**/*'
 
-#             #Generate Schema Change Script file (SQLDelta.sql)
-#             - task: SqlAzureDacpacDeployment@1
-#               displayName: 'Generate Schema Change Script (SQLDelta.sql - DB VERIFY)'
-#               inputs:
-#                 azureSubscription: 'azAppServiceCon'
-#                 authenticationType: 'server'
-#                 serverName: '$(dbServerName).database.windows.net'
-#                 DatabaseName: '$(dbName)'
-#                 sqlUsername: '$(dbAdminLogin)'
-#                 sqlPassword: '$(dbAdminPassword)'
-#                 deployType: 'DacpacTask'
-#                 deploymentAction: 'Script'
-#                 dacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
-#                 IpDetectionMethod: 'AutoDetect'
+            #Generate Schema Change Script file (SQLDelta.sql)
+            - task: SqlAzureDacpacDeployment@1
+              displayName: 'Generate Schema Change Script (SQLDelta.sql - DB VERIFY)'
+              inputs:
+                azureSubscription: 'azAppServiceCon'
+                authenticationType: 'server'
+                serverName: '$(dbServerName).database.windows.net'
+                DatabaseName: '$(dbName)'
+                sqlUsername: '$(dbAdminLogin)'
+                sqlPassword: '$(dbAdminPassword)'
+                deployType: 'DacpacTask'
+                deploymentAction: 'Script'
+                dacpacFile: '$(Pipeline.Workspace)/dropDacpac/Tailspin.SpaceGame.Database/bin/Debug/Tailspin.SpaceGame.Database.dacpac'
+                IpDetectionMethod: 'AutoDetect'
 
-#             #Reads contents from SQLDelta.sql script file, publish it to the Pipeline
-#             #By using script output (Get-Content), the database administrator can approve the changes before the changes are applied to the database.
-#             - task: PowerShell@2
-#               displayName: 'Read, Publish Auto Generated SQL Changes Script Contents to Pipeline'
-#               inputs:
-#                 targetType: 'inline'
-#                 script: |
-#                   Write-Host "Auto Generated SQL Changes Script (SQLDelta.sql)"
-#                   Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
+            #Reads contents from SQLDelta.sql script file, publish it to the Pipeline
+            #By using script output (Get-Content), the database administrator can approve the changes before the changes are applied to the database.
+            - task: PowerShell@2
+              displayName: 'Read, Publish Auto Generated SQL Changes Script Contents to Pipeline'
+              inputs:
+                targetType: 'inline'
+                script: |
+                  Write-Host "Auto Generated SQL Changes Script (SQLDelta.sql)"
+                  Get-Content d:\a\1\s\GeneratedOutputFiles\$(dbName)_Script.sql | foreach {Write-Output $_}
 
 # - stage: 'DB_APPLY'
 #   displayName: 'Apply DB Schema Change'
