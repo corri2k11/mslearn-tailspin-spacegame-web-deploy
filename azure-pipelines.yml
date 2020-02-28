@@ -149,7 +149,7 @@ stages:
         displayName: 'Download and installing JMeter for Load Test'
 
       #runs JMeter passing arguments, -t test plan file, -o output file, -Jhostname, etc.
-      - script: apache-jmeter-$(jmeterVersion)/bin/./jmeter -n -t LoadTest.jmx -o LoadTestResults.xml -Jhostname=$(STAGING_HOSTNAME)
+      - script: apache-jmeter-$(jmeterVersion)/bin/./jmeter -n -t LoadTest.jmx -o Results.xml -Jhostname=$(STAGING_HOSTNAME)
         displayName: 'Running Load Test...'
 
       #download and install XSLT Processor
@@ -157,11 +157,11 @@ stages:
       - script: |
           sudo apt-get update
           sudo apt-get install xsltproc
-          xsltproc JMeter2JUnit.xsl LoadTestResults.xml > JUnitLoadTestResults.xml
+          xsltproc JMeter2JUnit.xsl Results.xml > JUnitResults.xml
         displayName: 'Transforming JMeter test results to JUnit '
       
       #publish resulting JUnit XML file to the Pipeline, to visualize the performance load test results
       - task: PublishTestResults@2
         inputs:
-          testResultsFiles: JUnitLoadTestResults.xml
+          testResultsFiles: JUnitResults.xml
           testResultsFormat: JUnit
