@@ -1,156 +1,158 @@
+using System;
+using System.Collections;
 using NUnit.Framework;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Firefox;
 using OpenQA.Selenium.IE;
 using OpenQA.Selenium.Support.UI;
-using System;
-using System.Collections;
+
+//NOTE: HomePageTest will need an IWebDriver member variable
+//      "IWebDriver" IS the programming interface to use to 
+//      launch a Web Browser and interact with the page content
+//
+//      NuGet package for each browser installs the driver software
+//      in the bin dir, wich is alongside the compiled test code.
+//      This tells the concrete driver class where to find the underlying driver code/software
+//
+//Test Case Data
+//**************
+//
+//-In NUnit you can provide data to your tests in different ways.
+//Here we use "TestCase attribute" which takes argumkents that it later passes back to the test method when it runs.
+//We can have multiple "TestCase attributes", not only one, that each test a different feature of the app.
+//Each "TestCase attribute" produces a test case that's included in the report that appears at the end of the pipeline run.
 
 namespace UITests
 {
-    [TestFixture("Chrome")]
+    //Tell NUnit Testing Framework/Runner to run entire set of tests definned in the class, fixture will be ran multiple times, one for each browser type to test on.-
     [TestFixture("Firefox")]
-    [TestFixture("IE")]
-    public class HomePageTest
+    public class HomePageTest 
     {
-        private string browser;
-        private IWebDriver driver;
+        private IWebDriver _driver;
+        private string _browserTest;
 
-        public HomePageTest(string browser)
+        public HomePageTest(string browserTest) 
         {
-            this.browser = browser;
+            this._browserTest = browserTest;
         }
 
+        //Attribute tells NUnit Testing Framework to run this method only one time per test fixture run
         [OneTimeSetUp]
         public void Setup()
         {
-            try
-            {
-                // The NuGet package for each browser installs driver software
-                // under the bin directory, alongside the compiled test code.
-                // This tells the driver class where to find the underlying driver software.
-                var cwd = Environment.CurrentDirectory;
+            //Need to assign/set our IWebDriver variable to a concrete class instance that implements this interface 
+            //and for the browser we're testing on
+            var cwd = Environment.CurrentDirectory;  //current dir
 
-                // Create the driver for the current browser.
-                switch(browser)
-                {
-                  case "Chrome":
-                    driver = new ChromeDriver(cwd);
+            switch (this._browserTest)
+            {
+                case "Chrome":
+                    this._driver = new ChromeDriver(cwd);
                     break;
-                  case "Firefox":
-                    driver = new FirefoxDriver(cwd);
+                case "Firefox":
+                    this._driver = new FirefoxDriver(cwd);
                     break;
-                  case "IE":
-                    driver = new InternetExplorerDriver(cwd);
+                case "IE":
+                    this._driver = new InternetExplorerDriver(cwd);
                     break;
-                  default:
-                    throw new ArgumentException($"'{browser}': Unknown browser");
-                }
+                default:
+                    throw new ArgumentException($"'{this._browserTest}': Unknown browser");
+            }
 
-                // Wait until the page is fully loaded on every page navigation or page reload.
-                driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(20);
-
-                // Navigate to the site.
-                // The site name is stored in the SITE_URL environment variable to make 
-                // the tests more flexible.
-                string url = Environment.GetEnvironmentVariable("SITE_URL");
-                driver.Navigate().GoToUrl(url + "/");
-
-                // Wait for the page to be completely loaded.
-                new WebDriverWait(driver, TimeSpan.FromSeconds(10))
-                    .Until(d => ((IJavaScriptExecutor) d)
-                        .ExecuteScript("return document.readyState")
-                        .Equals("complete"));
-            }
-            catch (DriverServiceNotFoundException)
-            {
-            }
-            catch (WebDriverException)
-            {
-                Cleanup();
-            }
-        }
-    
-        [OneTimeTearDown]
-        public void Cleanup()
-        {
-            if (driver != null)
-            {
-                driver.Quit();
-            }
+            //Navigate to the SpaceGameWeb Site
+            string url = Environment.GetEnvironmentVariable("SITE_URL");
+            _driver.Navigate().GoToUrl(url+"/");
         }
 
-        // Download game
-        [TestCase("download-btn", "pretend-modal")]
-        // Screen image
-        [TestCase("screen-01", "screen-modal")]
-        // // Top player on the leaderboard
-        [TestCase("profile-1", "profile-modal-1")]
-        public void ClickLinkById_ShouldDisplayModalById(string linkId, string modalId)
+        //Test Methods (Based off the manual tests | Good practice to give them descriptive names that exactly/precisely describe what the test does)
+        [TestCase("download-btn","pretend-modal")]
+        [TestCase("screen-01","screen-modal")]
+        [TestCase("profile-1","profile-modal-1")]
+        public void ClickLinkById_ShouldDisplayModalById(string linkId, string modalId) 
         {
-            // Skip the test if the driver could not be loaded.
-            // This happens when the underlying browser is not installed.
-            if (driver == null)
+            //Test Goal:
+            //    Verify proper modal window appears after clicking the link
+            //Steps/procedure:
+            // 1. Locate link by id, then click on it
+            // 2. Locate resulting window modal
+            // 3. Close the modal
+            // 4. Verify modal was displayed correctly/accordingly
+
+            //Skip test if driver could not be loaded. Happens when underlying browser is NOT INSTALLED
+            if(this._driver == null) 
             {
                 Assert.Ignore();
                 return;
             }
 
-            // Locate the link by its ID and then click the link.
-            ClickElement(FindElement(By.Id(linkId)));
+            //OPEN MODAL WINDOW
+            //*****************
 
-            // Locate the resulting modal.
-            IWebElement modal = FindElement(By.Id(modalId));
+            //Locate element, click it, OPEN modal
+            MyClickElement( MyFindElement( By.Id(linkId) ) );
+            
+            //Locate resulting modal window
+            IWebElement modal = MyFindElement( By.Id(modalId) );
+            
+            //Record whether the modal window was successfully displayed or not
+            bool modalDisplayed = (modal != null && modal.Displayed);
 
-            // Record whether the modal was successfully displayed.
-            bool modalWasDisplayed = (modal != null && modal.Displayed);
-
-            // Close the modal if it was displayed.
-            if (modalWasDisplayed)
+            //CLOSE MODAL WINDOW
+            //******************
+            if(modalDisplayed)
             {
-                // Click the close button that's part of the modal.
-                ClickElement(FindElement(By.ClassName("close"), modal));
+                //Click modal CLOSE button
+                MyClickElement( MyFindElement( By.ClassName("close"), modal) );
                 
-                // Wait for the modal to close and for the main page to again be clickable.
-                FindElement(By.TagName("body"));
+                //Wait for modal window to close and for main page to be clickable again
+                MyFindElement( By.TagName("body") );
             }
 
-            // Assert that the modal was displayed successfully.
-            // If it wasn't, this test will be recorded as failed.
-            Assert.That(modalWasDisplayed, Is.True);
+            //Assert modal window was displayed correctly, otherwise test will fail
+            Assert.That( modalDisplayed, Is.True );
         }
 
-        private IWebElement FindElement(By locator, IWebElement parent = null, int timeoutSeconds = 10)
+        //*******************************************
+        //Helper Methods (Callable from test methods)
+        //*******************************************
+
+        //Two actions to be repeated over and over throughout the test:
+        //Helper methods are general enough to use in almost any test, we can later add more as we need them
+
+        //1. Finding elements on the page by id, returns IWebElement class
+        //2. Click found element on the page (such as buttons or links)
+        //   Selenium provides ways to programmatically click a button or link 
+        //   by using JavaScript via "IJavaScriptExecutor" class
+        //   ChromeDriver, FirefoxDriver and InternetExplorerDriver all support/implement the IJavaScriptExecutor interface, so have the same methods.
+
+        //Find
+        public IWebElement MyFindElement(By byLocator, IWebElement parentEl = null, int timeout = 10)
         {
-            // WebDriverWait enables us to wait for the specified condition to be true
-            // within a given time period.
-            return new WebDriverWait(driver, TimeSpan.FromSeconds(timeoutSeconds))
+            //Wait for specified condition to be true, like a page load event... then lookup element!
+            //Use "By" class to locate/find elements, it has methods that allow you to find the element by id, name, html tag, css class, etc.
+            return new WebDriverWait(_driver, TimeSpan.FromSeconds(timeout))
                 .Until(c => {
-                    IWebElement element = null;
-                    // If a parent was provided, find its child element.
-                    if (parent != null)
-                    {
-                        element = parent.FindElement(locator);
-                    }
-                    // Otherwise, locate the element from the root of the DOM.
+                    IWebElement foundEl = null;
+                    if(parentEl != null) 
+                        foundEl = parentEl.FindElement(byLocator);
                     else
-                    {
-                        element = driver.FindElement(locator);
-                    }
-                    // Return true once the element is displayed and able to receive user input.
-                    return (element != null && element.Displayed && element.Enabled) ? element : null;
+                        foundEl = _driver.FindElement(byLocator);
+                    
+                    //return true after element is displayed and able to receive user input
+                    return (foundEl != null && 
+                            foundEl.Displayed &&   //Element has to be displayed and enabled, otherwise return null in Until() method...
+                            foundEl.Enabled) ? foundEl : null;
                 });
         }
 
-        private void ClickElement(IWebElement element)
+        //Click Found Element
+        public void MyClickElement(IWebElement el)
         {
-            // We expect the driver to implement IJavaScriptExecutor.
-            // IJavaScriptExecutor enables us to execute JavaScript code during the tests.
-            IJavaScriptExecutor js = driver as IJavaScriptExecutor;
-
-            // Through JavaScript, run the click() method on the underlying HTML object.
-            js.ExecuteScript("arguments[0].click();", element);
+            //IJavaScriptExecutor enables us to execute JS code during the tests.
+            //Call "IJavaScriptExecutor.ExecuteScript" method to run the js click() method on the underlying HTML object
+            var js = _driver as IJavaScriptExecutor;
+            js.ExecuteScript("arguments[0].click();", el);
         }
     }
 }
