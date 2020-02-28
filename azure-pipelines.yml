@@ -1,3 +1,7 @@
+#This pipeline build defintion focuses only on building and 
+#deploying to DEV, QA, STAGING stages and 
+#running the UI "RunUITests job" in the QA stage.
+
 trigger:
 - '*'
 
@@ -6,16 +10,16 @@ variables:
   dotnetSdkVersion: '3.1.100'
 
 stages:
-- stage: 'Build'
-  displayName: 'Build the web application'
+- stage: 'BUILD'
+  displayName: 'Build Web application'
   jobs: 
-  - job: 'Build'
+  - job: 'BUILD'
     displayName: 'Build job'
     pool:
       vmImage: 'ubuntu-16.04'
       demands:
         - npm
-
+        
     variables:
       wwwrootDir: 'Tailspin.SpaceGame.Web/wwwroot'
       dotnetSdkVersion: '3.1.100'
@@ -48,14 +52,14 @@ stages:
         projects: '**/*.csproj'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
+      displayName: 'Build the project for $(buildConfiguration)'
       inputs:
         command: 'build'
         arguments: '--no-restore --configuration $(buildConfiguration)'
         projects: '**/*.csproj'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Publish the project - $(buildConfiguration)'
+      displayName: 'Publish project for $(buildConfiguration) (BUILD)'
       inputs:
         command: 'publish'
         projects: '$(System.DefaultWorkingDirectory)/**/Tailspin.SpaceGame.Web.csproj' 
@@ -66,14 +70,14 @@ stages:
     - publish: '$(Build.ArtifactStagingDirectory)'
       artifact: drop
 
-- stage: 'Dev'
-  displayName: 'Deploy to the dev environment'
-  dependsOn: Build
+- stage: 'DEV'
+  displayName: 'Deploy to DEV'
+  dependsOn: BUILD
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: dev
+    environment: DEV
     variables:
     - group: Release
     strategy:
@@ -83,20 +87,20 @@ stages:
           - download: current
             artifact: drop
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (DEV)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              azureSubscription: 'azAppServiceCon'
               appName: '$(WebAppNameDev)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
 
-- stage: 'Test'
-  displayName: 'Deploy to the test environment'
-  dependsOn: Dev
+- stage: 'QA'
+  displayName: 'Deploy to QA'
+  dependsOn: DEV
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: test
+    environment: QA
     variables:
     - group: 'Release'
     strategy:
@@ -105,15 +109,16 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (QA)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
-              appName: '$(WebAppNameTest)'
+              azureSubscription: 'azAppServiceCon'
+              appName: '$(WebAppNameQA)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
   - job: RunUITests
     dependsOn: Deploy
-    displayName: 'Run UI tests'
+    displayName: 'Running UI tests!!!'
     pool:
       vmImage: 'windows-2019'
     variables:
@@ -123,28 +128,30 @@ stages:
       displayName: 'Use .NET Core SDK $(dotnetSdkVersion)'
       inputs:
         version: '$(dotnetSdkVersion)'
+
     - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
+      displayName: 'Build the Test project for $(buildConfiguration)'
       inputs:
         command: 'build'
         arguments: '--configuration $(buildConfiguration)'
         projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+    
     - task: DotNetCoreCLI@2
-      displayName: 'Run unit tests - $(buildConfiguration)'
+      displayName: 'Run unit tests for $(buildConfiguration)'
       inputs:
         command: 'test'
         arguments: '--no-build --configuration $(buildConfiguration)'
         publishTestResults: true
         projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
-- stage: 'Staging'
+- stage: 'STAGING'
   displayName: 'Deploy to the staging environment'
-  dependsOn: Test
+  dependsOn: QA
   jobs:
   - deployment: Deploy
     pool:
       vmImage: 'ubuntu-16.04'
-    environment: staging
+    environment: STAGING
     variables:
     - group: 'Release'
     strategy:
@@ -154,8 +161,8 @@ stages:
           - download: current
             artifact: drop
           - task: AzureWebApp@1
-            displayName: 'Azure App Service Deploy: website'
+            displayName: 'Azure App Service Deploy: website (STAGING)'
             inputs:
-              azureSubscription: 'Resource Manager - Tailspin - Space Game'
+              azureSubscription: 'azAppServiceCon'
               appName: '$(WebAppNameStaging)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
