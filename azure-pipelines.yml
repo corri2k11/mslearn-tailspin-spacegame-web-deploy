@@ -127,9 +127,23 @@ stages:
           steps:
           - download: current
             artifact: drop
+
           - task: AzureWebApp@1
             displayName: 'Azure App Service Deploy: website (STAGING)'
             inputs:
               azureSubscription: 'azAppServiceCon'
+              deployToSlotOrASE: true
+              resourceGroupName: 'rg1'
+              slotName: 'swap'  #new features by default go to swap depl slot - GREEN
               appName: '$(WebAppNameStaging)'
               package: '$(Pipeline.Workspace)/drop/$(buildConfiguration)/*.zip'
+
+          - task: AzureAppServiceManage@0
+            displayName: 'Swapping Deployment Slots in STAGING'
+            inputs:
+              azureSubscription: 'azAppServiceCon'
+              resourceGroupName: 'rg1'
+              webAppName: '$(WebAppNameStaging)'
+              sourceSlot: 'swap'
+              targetSlot: 'production'
+              action: 'Swap Slots'
